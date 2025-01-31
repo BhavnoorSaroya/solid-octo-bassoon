@@ -171,7 +171,7 @@ def get_latest_board_data():
 
 def send_slack_message(text):
     print("sending message")
-    url = "https://hooks.slack.com/services/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"
+    url = "https://hooks.slack.com/services/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"
     payload = {
             "text": f"{text}"
         }
