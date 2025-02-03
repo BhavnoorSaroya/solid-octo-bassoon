@@ -82,7 +82,7 @@ Respond in this format:
   "api_action": {
     "endpoint": "/cards/", #an example might be /1/boards/?=boardname
     "method": "POST", #POST, GET, PUT, DELETE
-    "url_params": "?idList=661394704c2a987336df9f98"
+    "url_params": "?idList=67a104b5f5273bdd9291d310"
     "parameters": {
       "name": "Fix bug #123",
       "idList": "LIST_ID" #the ID of the list
@@ -90,12 +90,12 @@ Respond in this format:
   },
   "response": "I went ahead created a card titled 'Fix bug #123' in the 'To Do' list"
 }
-Make sure the JSON is valid, and always include both the `api_action` and `response` fields. use board id 66139453d583b37182e95aaa, 
+Make sure the JSON is valid, and always include both the `api_action` and `response` fields. use board id 67a104b5f5273bdd9291d2a9, 
  """ + f"here is the latest card and list data: {get_latest_board_data()}"},
             {"role": "user", "content": text}
         ]
     )
-    # choose an appropriate list from: todo: 661394704c2a987336df9f98, in progress: 6613945fa358664a00f38d56, further along: 66139491e4b737bc8da66f92, and complete: 66139465939def4c4e167040
+    # choose an appropriate list from: todo: 67a104b5f5273bdd9291d310, in progress: 6613945fa358664a00f38d56, further along: 66139491e4b737bc8da66f92, and complete: 66139465939def4c4e167040
     print ("response")
     # print(response)
     # Parse GPT response
@@ -148,13 +148,15 @@ def execute_trello_action(action):
     print(res.status_code)
         
 
+# does this restrict the bot to a single board?
+
 def get_latest_board_data():
-    board_id = "66139453d583b37182e95aaa"
+    board_id = "67a104b5f5273bdd9291d2a9"
     print("getting board data")
     url = f"{TRELLO_API_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
     
     response = requests.get(url)
-    # print(type(response.json()))
+    print("\n\n\n\nResponse type: ", type(response), "\n\n\n\n\n\n")
     boards = response.json()
     
     
@@ -171,7 +173,7 @@ def get_latest_board_data():
 
 def send_slack_message(text):
     print("sending message")
-    url = "https://hooks.slack.com/services/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"
+    url = "https://hooks.slack.com/services/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"
     payload = {
             "text": f"{text}"
         }
