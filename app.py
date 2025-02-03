@@ -19,6 +19,7 @@ app = Flask(__name__)
 # Slack setup
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 signature_verifier = SignatureVerifier(os.getenv("SLACK_SIGNING_SECRET"))
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
 # OpenAI setup
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -173,7 +174,7 @@ def get_latest_board_data():
 
 def send_slack_message(text):
     print("sending message")
-    url = "https://hooks.slack.com/services/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"
+    url = SLACK_WEBHOOK_URL
     payload = {
             "text": f"{text}"
         }
