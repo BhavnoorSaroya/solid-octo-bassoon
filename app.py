@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 import threading # yes i am a badass, save it
 import ast # for string to dict conversion using built-in eval 
-#frankly this could be written in rust and be faster but here we are
+#frankly this could be written in rust and be faster but here we are 
 
 # Load environment variables
 load_dotenv()
