@@ -28,6 +28,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 TRELLO_API_KEY = os.getenv("TRELLO_API_KEY")
 TRELLO_API_TOKEN = os.getenv("TRELLO_API_TOKEN")
 TRELLO_API_BASE = "https://api.trello.com/1"
+TRELLO_BOARD_ID = os.getenv("TRELLO_BOARD_ID")
 
 # Slack event endpoint
 @app.route("/slack/events", methods=["POST", "GET"])
@@ -91,7 +92,7 @@ Respond in this format:
   },
   "response": "I went ahead created a card titled 'Fix bug #123' in the 'To Do' list"
 }
-Make sure the JSON is valid, and always include both the `api_action` and `response` fields. use board id 67a104b5f5273bdd9291d2a9, 
+Make sure the JSON is valid, and always include both the `api_action` and `response` fields. use board id {TRELLO_BOARD_ID}, 
  """ + f"here is the latest card and list data: {get_latest_board_data()}"},
             {"role": "user", "content": text}
         ]
@@ -152,7 +153,7 @@ def execute_trello_action(action):
 # does this restrict the bot to a single board?
 
 def get_latest_board_data():
-    board_id = "67a104b5f5273bdd9291d2a9"
+    board_id = TRELLO_BOARD_ID
     print("getting board data")
     url = f"{TRELLO_API_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
     
