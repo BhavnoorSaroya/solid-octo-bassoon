@@ -139,7 +139,6 @@ def execute_trello_action(action):
     print(res.status_code)
         
 
-# does this restrict the bot to a single board?
 
 def get_latest_board_data():
     board_id = TRELLO_BOARD_ID
