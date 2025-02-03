@@ -9,7 +9,13 @@ Tied in to slack for simplicity
 - speak to ai agent for quick interactions (eg natural language conversation with reprompting prior to action execution)
 - speak within slack thread to maintain context
 
+- poke holes in it until were comfortable with it
+
 - make board id dynamic
+
+- make clutch a downloadable slack app
+
+- test with enactus members
 
 - web dash to interact with personal trello tasks
 - manual addition of tasks to trello from web ui
