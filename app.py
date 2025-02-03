@@ -146,7 +146,6 @@ def get_latest_board_data():
     url = f"{TRELLO_API_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
     
     response = requests.get(url)
-    print("\n\n\n\nResponse: ", (response), "\n\n\n\n\n\n")
     boards = response.json()
     
     
