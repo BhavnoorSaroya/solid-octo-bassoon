@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import json
 from slack_sdk import WebClient
 from slack_sdk.signature import SignatureVerifier
-import openai
+import openai 
 import requests
 import os
 from dotenv import load_dotenv
