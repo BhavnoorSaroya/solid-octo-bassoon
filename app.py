@@ -15,173 +15,138 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
-# Slack setup
+# Slack setup (ensure these tokens are current and belong to an active bot)
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 signature_verifier = SignatureVerifier(os.getenv("SLACK_SIGNING_SECRET"))
-SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
-# OpenAI setup
+# OpenAI and Trello setup remain the same
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Trello setup
 TRELLO_API_KEY = os.getenv("TRELLO_API_KEY")
 TRELLO_API_TOKEN = os.getenv("TRELLO_API_TOKEN")
 TRELLO_API_BASE = "https://api.trello.com/1"
 TRELLO_BOARD_ID = os.getenv("TRELLO_BOARD_ID")
 
-# Slack event endpoint
-@app.route("/slack/events", methods=["POST", "GET"])
+# Slash command endpoint for /clutchAI
+@app.route("/slack/events", methods=["POST"])
 def slack_events():
-    # Verify request signature
+    # (Optional) Verify the request signature:
     # if not signature_verifier.is_valid_request(request.get_data(), request.headers):
     #     return "Invalid request signature", 403
 
-    # Parse event data
     data = request.form
-    # if "challenge" in data:  # Handle Slack verification challenge
-    #     return jsonify({"challenge": data["challenge"]})
-    if data:
-        # magic happens here
-        threading.Thread(target=handle_message, args=("user_id", data["text"], "channel")).start()
 
-    response = {
-        "statusCode": 200,
-        "response_type": "in_channel",
-        # "text": f"{response_text}"
-        "text" : f"thinking..."
-    }
-    return response, 200
+    # Check that we received a slash command payload
+    if data and "channel_id" in data:
+        channel_id = data["channel_id"]
+        user_text = data.get("text", "").strip()  # may be empty if no arguments
 
-def handle_message(user_id, text, channel):
-    # Step 1: Send the user's message to OpenAI
-    response = openai.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system",
-                "content": 
-                """You are a bot that processes Trello requests and generates:
-                1. The Trello API action needed (endpoint, method, parameters).
-                2. A natural language response for the user.
+        # Step 1: Post an initial thread message (this becomes the thread anchor)
+        try:
+            init_resp = slack_client.chat_postMessage(
+                channel=channel_id,
+                text="Thread started—please type your Trello command below."
+            )
+            # Capture the thread's ts for future replies.
+            thread_ts = init_resp["ts"]
+            print("Thread initiated with ts:", thread_ts)
 
-                User Request: "Create a card in the 'To Do' list of the 'Project Alpha' board titled 'Fix bug #123'."
+        except Exception as e:
+            print(f"Error creating thread: {e}")
+            return jsonify({"text": "Error starting thread"}), 500
 
-                Respond in this format:
+        # Optionally, if the user provided text with the slash command,
+        # you can choose to process it as the first command within the thread.
+        if user_text:
+            threading.Thread(
+                target=handle_message, 
+                args=(data.get("user_id", ""), user_text, channel_id, thread_ts)
+            ).start()
 
-                {
-                "api_action": {
-                    "endpoint": "/cards/", #an example might be /1/boards/?=boardname
-                    "method": "POST", #POST, GET, PUT, DELETE
-                    "url_params": "?idList=67a104b5f5273bdd9291d310"
-                    "parameters": {
-                    "name": "Fix bug #123",
-                    "idList": "LIST_ID" #the ID of the list
-                    }
-                },
-                "response": "I went ahead created a card titled 'Fix bug #123' in the 'To Do' list"
-                }
-                Make sure the JSON is valid, and always include both the `api_action` and `response` fields. use board id {TRELLO_BOARD_ID}, 
-                """
-            
-            + f"here is the latest card and list data: {get_latest_board_data()}"},
-            
-            {"role": "user", "content": text}
-        ]
+        # Immediately respond to the slash command with an ephemeral message.
+        response_payload = {
+            "response_type": "in_channel",
+            "text": "Thread started—continue your commands in the thread below."
+        }
+        return jsonify(response_payload), 200
+
+    return jsonify({"text": "No data received"}), 200
+
+def handle_message(user_id, text, channel, thread_ts):
+    # Update your OpenAI system prompt to include that context.
+    system_prompt = (
+        "You are ClutchAI, a Slack bot that assists with Trello board operations. "
+        "This conversation is happening in a dedicated thread. Use the context of the thread "
+        "and the latest Trello board data to determine the necessary Trello API actions and "
+        "provide a natural language response. Here is the current board data: " + get_latest_board_data()
     )
-    # choose an appropriate list from: todo: 67a104b5f5273bdd9291d310, in progress: 6613945fa358664a00f38d56, further along: 66139491e4b737bc8da66f92, and complete: 66139465939def4c4e167040
-    
-    
-    # print(response.choices[0].message.content)
-    
-    gpt_response = ast.literal_eval(response.choices[0].message.content)
-    
-    print("api actions", gpt_response['api_action'])
-    # response_data = eval(gpt_response)  # Convert response to dict (ensure OpenAI returns valid JSON)
-    api_action = gpt_response['api_action']
-    user_response = gpt_response['response']
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ]
+        )
+    except Exception as e:
+        send_slack_message(f"Error processing your request: {str(e)}", channel, thread_ts)
+        return
 
-    # Step 2: Execute the Trello API action
-    execute_trello_action(api_action)
+    try:
+        # Ensure valid JSON output from OpenAI
+        gpt_response = ast.literal_eval(response.choices[0].message.content)
+    except Exception as e:
+        send_slack_message(f"Error parsing AI response: {str(e)}", channel, thread_ts)
+        return
 
-    # Step 3: Respond back to Slack
-    send_slack_message(user_response)
+    api_action = gpt_response.get('api_action')
+    user_response = gpt_response.get('response')
 
-    # except Exception as e:
-        # slack_client.chat_postMessage(channel=channel, text=f"Error processing your request: {str(e)}")
-    # return "success from handle_message"
+    # Execute the Trello API action (if needed)
+    if api_action:
+        execute_trello_action(api_action)
+
+    # Post the AI response in the thread
+    send_slack_message(user_response, channel, thread_ts)
 
 def execute_trello_action(action):
-    print("executing action")
     endpoint = action['endpoint']
     method = action['method']
     parameters = action['parameters']
-    try:
-        url_params = action['url_params']
-    except KeyError:
-        url_params = "?"
-
-    print(parameters)
-
-    # Add authentication to parameters
+    url_params = action.get('url_params', "?")
     parameters.update({
         "key": TRELLO_API_KEY,
         "token": TRELLO_API_TOKEN
     })
-
-    # Make the API call
     url = f"{TRELLO_API_BASE}{endpoint}{url_params}&key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
-    print(url)
     if method == "POST":
         res = requests.post(url, json=parameters)
     elif method == "PUT":
         res = requests.put(url, json=parameters)
     elif method == "DELETE":
         res = requests.delete(url, params=parameters)
-    print(res.status_code)
-        
-
+    print("Trello action status:", res.status_code)
 
 def get_latest_board_data():
     board_id = TRELLO_BOARD_ID
-    print("getting board data")
-    url = f"{TRELLO_API_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
-    
-    response = requests.get(url)
-    boards = response.json()
-    
-    
-    
-    url = f"{TRELLO_API_BASE}/boards/{board_id}/lists?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
-    response = requests.get(url)
-    lists = response.json()
-    
-    data = {"cards": boards, "lists": lists}
-    
-    print("returning board data", str(data))
-    return str(data)
+    url_cards = f"{TRELLO_API_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
+    boards = requests.get(url_cards).json()
+    url_lists = f"{TRELLO_API_BASE}/boards/{board_id}/lists?key={TRELLO_API_KEY}&token={TRELLO_API_TOKEN}"
+    lists = requests.get(url_lists).json()
+    return str({"cards": boards, "lists": lists})
 
+def send_slack_message(text, channel, thread_ts=None):
+    try:
+        response = slack_client.chat_postMessage(
+            channel=channel,
+            text=text,
+            thread_ts=thread_ts
+        )
+        print("Message sent with ts:", response["ts"])
+    except Exception as e:
+        print("Error sending message:", e)
 
-def send_slack_message(text):
-    print("sending message")
-    url = SLACK_WEBHOOK_URL
-    payload = {
-            "text": f"{text}"
-        }
-    headers = {
-    "Content-Type": "application/json"
-    }
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
-    print("Status Code:", response.status_code)
-    print("Response:", response.text)
-
-
-# Health check endpoint
 @app.route("/health", methods=["GET"])
 def health_check():
-    answer = 1 + 1
-    print(answer)
-    if answer == 2:
-        print("health check, universe in order")
-    
     return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
