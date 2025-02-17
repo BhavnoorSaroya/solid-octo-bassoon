@@ -11,11 +11,11 @@ import ast
 
 
 
-# Load environment variables
+# Load environment variables 
 load_dotenv()
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__) 
 
 # Slack setup
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
@@ -47,9 +47,6 @@ def slack_events():
     response_url = data.get("response_url")  # Use this for ephemeral responses
 
     # print("data", data)
-    # Ignore bot messages to prevent infinite loops
-    # if data.get("subtype") == "bot_message":
-    #     return jsonify({"status": "ignored"}), 200
 
     
     
